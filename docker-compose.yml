@@ -27,6 +27,8 @@ services:
     image: jenkins/jenkins:lts-jdk11
     container_name: jenkins-controller
     restart: unless-stopped
+    depends_on:
+      - dind
     networks:
       - jenkins_net # Connects Jenkins to the same network as the dind service.
     ports:
@@ -40,8 +42,8 @@ services:
       - jenkins-docker-certs:/certs/client:ro
     # 'environment' variables for the jenkins service.
     environment:
-      # Tells Jenkins where to find the Docker daemon (on the 'docker' host, port 2376).
-      - DOCKER_HOST=tcp://docker:2376
+      # Tells Jenkins where to find the Docker daemon.
+      - DOCKER_HOST=tcp://dind:2376
       # Specifies the path to the client TLS certificates.
       - DOCKER_CERT_PATH=/certs/client
       # Enforces a secure, verified TLS connection to the Docker daemon.
