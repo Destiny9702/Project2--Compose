@@ -63,7 +63,10 @@ networks:
 volumes:
   # Volume for Jenkins home directory data.
   jenkins-data:
+    name: jenkins-data  
   # Volume for Docker TLS certificates.
   jenkins-docker-certs:
+    name: jenkins-docker-certs  
   # Volume for Docker layer cache to improve build performance.
   docker-layer-cache:
+    name: docker-layer-cache
