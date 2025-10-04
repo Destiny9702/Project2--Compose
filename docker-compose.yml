@@ -1,45 +1,61 @@
+# Defines the version of the Docker Compose file format.
 version: '3.7'
 
+# Defines the services (containers) for our environment.
 services:
   # The Docker-in-Docker (DinD) service.
+  # This container's sole purpose is to run a Docker daemon that Jenkins can connect to.
   dind:
-    image: docker:20.10.7-dind 
-    privileged: true 
-    container_name: jenkins-docker 
-    restart: unless-stopped # Ensure the service restarts automatically if it stops unexpectedly.
+    image: docker:20.10.7-dind
+    privileged: true # 'privileged' mode is required for a Docker daemon to run inside a container.
+    container_name: jenkins-docker
+    restart: unless-stopped # Ensures the service restarts automatically if it stops unexpectedly.
     networks:
-      jenkins_net: 
+      jenkins_net:
         aliases:
           - docker 
+    # 'volumes' for the dind service.
     volumes:
-      - jenkins-docker-certs:/certs/client 
-      - jenkins-data:/var/jenkins_home # Share the jenkins_home volume to allow Jenkins to access Docker build contexts.
+      # Named volume for storing TLS certificates for secure communication.
+      - jenkins-docker-certs:/certs/client
+      # Shares the Jenkins home volume so DinD can access build contexts.
+      - jenkins-data:/var/jenkins_home
 
   # The Jenkins controller service.
+  # This container runs the main Jenkins application.
   jenkins:
-    image: jenkins/jenkins:lts-jdk11 # Use the official Long-Term Support Jenkins image with JDK 11.
-    container_name: jenkins-controller 
-    restart: unless-stopped # Ensure the service restarts automatically.
+    image: jenkins/jenkins:lts-jdk11
+    container_name: jenkins-controller
+    restart: unless-stopped
     networks:
-      - jenkins_net 
+      - jenkins_net # Connects Jenkins to the same network as the dind service.
     ports:
-      - "8080:8080" 
+      - "8080:8080"   
       - "50000:50000" 
+    # 'volumes' for the jenkins service.
     volumes:
-      - jenkins-data:/var/jenkins_home # Mount the named volume to persist Jenkins data (jobs, configurations, etc.).
-      - jenkins-docker-certs:/certs/client:ro # Mount the certs volume in read-only mode for security.
+      # This allows the 'agent any' stage to execute 'docker' commands.
+      - /usr/bin/docker:/usr/bin/docker
+      # Named volume to persist all Jenkins data (jobs, plugins, configurations).
+      - jenkins-data:/var/jenkins_home
+      # Mounts the TLS certificates in read-only mode for connecting to DinD.
+      - jenkins-docker-certs:/certs/client:ro
+    # 'environment' variables for the jenkins service.
     environment:
-      # Configure Jenkins to connect to the DinD service using TLS for a secure connection.
+      # Tells Jenkins where to find the Docker daemon (on the 'docker' host, port 2376).
       - DOCKER_HOST=tcp://docker:2376
+      # Specifies the path to the client TLS certificates.
       - DOCKER_CERT_PATH=/certs/client
+      # Enforces a secure, verified TLS connection to the Docker daemon.
       - DOCKER_TLS_VERIFY=1
 
-# Define the networks to be created.
 networks:
-  jenkins_net: 
+  jenkins_net:
     driver: bridge
 
-# Define the named volumes to persist data.
+# 'volumes' defines named volumes for persistent data storage.
 volumes:
-  jenkins-data: # Persists Jenkins home directory data.
-  jenkins-docker-certs: # Persists Docker TLS certificates.
+  # Volume for Jenkins home directory data.
+  jenkins-data:
+  # Volume for Docker TLS certificates.
+  jenkins-docker-certs:
