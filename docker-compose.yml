@@ -34,8 +34,6 @@ services:
       - "50000:50000" 
     # 'volumes' for the jenkins service.
     volumes:
-      # This allows the 'agent any' stage to execute 'docker' commands.
-      - /usr/bin/docker:/usr/bin/docker
       # Named volume to persist all Jenkins data (jobs, plugins, configurations).
       - jenkins-data:/var/jenkins_home
       # Mounts the TLS certificates in read-only mode for connecting to DinD.
