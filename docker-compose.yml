@@ -13,13 +13,19 @@ services:
     networks:
       jenkins_net:
         aliases:
-          - docker 
+          - docker
     # 'volumes' for the dind service.
     volumes:
       # Named volume for storing TLS certificates for secure communication.
       - jenkins-docker-certs:/certs/client
       # Shares the Jenkins home volume so DinD can access build contexts.
       - jenkins-data:/var/jenkins_home
+      # Named volume for Docker layer cache to improve build performance.
+      - docker-layer-cache:/var/lib/docker
+    # 'environment' variables for the dind service.
+    environment:
+      # Specifies directory for TLS certificates (enables certificate generation).
+      - DOCKER_TLS_CERTDIR=/certs
 
   # The Jenkins controller service.
   # This container runs the main Jenkins application.
@@ -32,8 +38,8 @@ services:
     networks:
       - jenkins_net # Connects Jenkins to the same network as the dind service.
     ports:
-      - "8080:8080"   
-      - "50000:50000" 
+      - "8080:8080"   # Jenkins web interface
+      - "50000:50000" # Jenkins agent communication port
     # 'volumes' for the jenkins service.
     volumes:
       # Named volume to persist all Jenkins data (jobs, plugins, configurations).
@@ -43,7 +49,7 @@ services:
     # 'environment' variables for the jenkins service.
     environment:
       # Tells Jenkins where to find the Docker daemon.
-      - DOCKER_HOST=tcp://dind:2376
+      - DOCKER_HOST=tcp://docker:2376
       # Specifies the path to the client TLS certificates.
       - DOCKER_CERT_PATH=/certs/client
       # Enforces a secure, verified TLS connection to the Docker daemon.
@@ -59,3 +65,5 @@ volumes:
   jenkins-data:
   # Volume for Docker TLS certificates.
   jenkins-docker-certs:
+  # Volume for Docker layer cache to improve build performance.
+  docker-layer-cache:
