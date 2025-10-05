@@ -1,49 +1,64 @@
-# Version of the Docker Compose file format.
+# Defines the version of the Docker Compose file format.
 version: '3.7'
 
-# Define all the services that make up our application.
+# Defines the services (containers) for the environment.
 services:
   # The Docker-in-Docker (DinD) service.
-  # This container runs a standalone Docker daemon, which Jenkins will connect to.
   dind:
-    image: docker:20.10.7-dind # Use a specific version of the Docker-in-Docker image.
-    privileged: true # Privileged mode is required for the Docker daemon to run inside a container.
-    container_name: jenkins-docker # A friendly name for the DinD container.
-    restart: unless-stopped # Ensure the service restarts automatically if it stops unexpectedly.
+    image: docker:20.10.7-dind
+    privileged: true # 'privileged' mode is required for a Docker daemon to run inside a container.
+    container_name: jenkins-docker
+    restart: unless-stopped # Ensures the service restarts automatically if it stops unexpectedly.
     networks:
-      jenkins_net: # Connect to our custom network.
+      jenkins_net:
         aliases:
-          - docker # The hostname 'docker' will resolve to this container's IP on the jenkins_net network.
+          - docker # Allows other services to reach this container using the hostname 'docker'.
     volumes:
-      - jenkins-docker-certs:/certs/client # Named volume for TLS certificates.
-      - jenkins-data:/var/jenkins_home # Share the jenkins_home volume to allow Jenkins to access Docker build contexts.
+      # Named volume for storing and sharing TLS certificates.
+      - jenkins-docker-certs:/certs/client
+      # Shares the Jenkins home volume so the Docker daemon can access build workspaces.
+      - jenkins-data:/var/jenkins_home
+      # Named volume for Docker layer cache to improve build performance.
+      - docker-layer-cache:/var/lib/docker
+    environment:
+      # Tells the DinD service to automatically generate TLS certificates.
+      - DOCKER_TLS_CERTDIR=/certs
 
   # The Jenkins controller service.
-  # This container runs the main Jenkins application.
   jenkins:
-    image: jenkins/jenkins:lts-jdk11 # Use the official Long-Term Support Jenkins image with JDK 11.
-    container_name: jenkins-controller # A friendly name for the Jenkins container.
-    restart: unless-stopped # Ensure the service restarts automatically.
+    image: jenkins/jenkins:lts-jdk11
+    container_name: jenkins-controller
+    restart: unless-stopped
+    depends_on:
+      - dind # Ensures the 'dind' service starts before the 'jenkins' service.
     networks:
-      - jenkins_net # Connect to our custom network so it can reach the DinD service.
+      - jenkins_net # Connects Jenkins to the same network as the 'dind' service.
     ports:
-      - "8080:8080" # Map host port 8080 to the container's port 8080 for accessing the Jenkins UI.
-      - "50000:50000" # Map port 50000 for communication with Jenkins agents.
+      - "8080:8080"   # Maps port for the Jenkins web interface.
+      - "50000:50000" # Maps port for Jenkins agent communication.
     volumes:
-      - jenkins-data:/var/jenkins_home # Mount the named volume to persist Jenkins data (jobs, configurations, etc.).
-      - jenkins-docker-certs:/certs/client:ro # Mount the certs volume in read-only mode for security.
+      # Named volume to persist all Jenkins data (jobs, plugins, configurations).
+      - jenkins-data:/var/jenkins_home
+      # Mounts the TLS certificates from the shared volume in read-only mode.
+      - jenkins-docker-certs:/certs/client:ro
     environment:
-      # Configure Jenkins to connect to the DinD service using TLS for a secure connection.
+      # Tells the Jenkins controller where to find the Docker daemon (the 'dind' service).
       - DOCKER_HOST=tcp://docker:2376
+      # Specifies the path to the client TLS certificates for the connection.
       - DOCKER_CERT_PATH=/certs/client
+      # Enforces a secure, verified TLS connection to the Docker daemon.
       - DOCKER_TLS_VERIFY=1
 
-# Define the networks to be created.
+# Defines the networks.
 networks:
-  jenkins_net: # A custom bridge network to allow containers to communicate with each other by name.
-    driver: bridge
+  jenkins_net:
+    driver: bridge 
 
-# Define the named volumes to persist data.
+# Defines the named volumes for persistent data storage.
 volumes:
-  jenkins-data: # Persists Jenkins home directory data.
-  jenkins-docker-certs: # Persists Docker TLS certificates.
+  # Volume for Jenkins home directory data.
+  jenkins-data:
+  # Volume for shared Docker TLS certificates.
+  jenkins-docker-certs:
+  # Volume for the persistent Docker layer cache.
+  docker-layer-cache:
