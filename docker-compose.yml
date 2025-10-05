@@ -27,6 +27,7 @@ services:
   # The Jenkins controller service.
   jenkins:
     image: jenkins/jenkins:lts-jdk11
+    user: root
     container_name: jenkins-controller
     restart: unless-stopped
     depends_on:
